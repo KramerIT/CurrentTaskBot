@@ -3,6 +3,7 @@ package com.kramar.bot.bot;
 
 import com.kramar.bot.dbo.TaskDbo;
 import com.kramar.bot.dbo.UserDbo;
+import com.kramar.bot.enam.UserPlanStatus;
 import com.kramar.bot.repository.TaskRepository;
 import com.kramar.bot.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private boolean collectAnswerFromUsers = false;
     private Map<Long, String> usersTaskMap = new HashMap<>();
+    private Map<Long, UserPlanStatus> usersStatusMap = new HashMap<>();
     private static final Long DREAM_TEAM_CHAT = -298029401L;
 
     @Autowired
@@ -53,71 +55,104 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "0 30 10 * * *")
+    @Scheduled(cron = "0 50 15 * * *")
     public void askCurrentTaskForToday() {
         collectAnswerFromUsers = true;
+        usersStatusMap.clear();
         List<UserDbo> all = userRepository.findAll().stream().filter(userDbo -> userDbo.getApprovedUser() && userDbo.getTelegramId() != null).collect(Collectors.toList());
         SendMessage message = new SendMessage();
-        message.setText("Чё буш сёння делать?");
+        message.setText("Чё буш сёння делать? Выбери нужную кнопочку \uD83C\uDF84");
         for (UserDbo userDbo : all) {
             message.setChatId(userDbo.getTelegramId());
+            message.setReplyMarkup(addNoteForTodayPlan());
             sendToUserMessage(message);
+            usersStatusMap.put(userDbo.getTelegramId(), UserPlanStatus.WAIT_BUTTON_ANSWER);
         }
     }
 
-    @Scheduled(cron = "0 35 10 * * *")
-    @Scheduled(cron = "0 05 19 * * *")
-    public void collectAnswersFromUsers() {
-        collectAnswerFromUsers = false;
-        for (Long id : usersTaskMap.keySet()) {
-            UserDbo userDbo = userRepository.findByTelegramId(id);
-            TaskDbo taskDbo = new TaskDbo();
-            taskDbo.setDate(LocalDate.now());
-            taskDbo.setOwner(userDbo);
-            taskDbo.setDescription(usersTaskMap.get(id));
-            taskRepository.save(taskDbo);
-            SendMessage message = new SendMessage();
-            message.setText(userDbo.getName() + ":\n" + "");
-        }
-        usersTaskMap.clear();
-    }
-
-    @Scheduled(cron = "0 0 19 * * *")
+    @Scheduled(cron = "0 55 15 * * *")
     public void askResultOfCurrentTask() {
         collectAnswerFromUsers = true;
+        usersStatusMap.clear();
+        usersTaskMap.clear();
         List<UserDbo> all = userRepository.findAll().stream().filter(userDbo -> userDbo.getApprovedUser() && userDbo.getTelegramId() != null).collect(Collectors.toList());
         SendMessage message = new SendMessage();
-        message.setText("Чё сделал сегодня?");
+        message.setText("Чё сделал сегодня? Выбери нужную кнопочку \uD83C\uDF84");
         for (UserDbo userDbo : all) {
             message.setChatId(userDbo.getTelegramId());
+            message.setReplyMarkup(addNoteForTodayPlan());
             sendToUserMessage(message);
+            usersStatusMap.put(userDbo.getTelegramId(), UserPlanStatus.WAIT_BUTTON_ANSWER);
         }
     }
 
-    @Scheduled(cron = "0 06 19 * * *")
-    public void pullToChatAllTodayTasks() {
-        List<UserDbo> all = userRepository.findAll().stream().filter(userDbo -> userDbo.getApprovedUser() && userDbo.getTelegramId() != null).collect(Collectors.toList());
-        for (UserDbo userDbo : all) {
-            StringBuilder text = null;
-            List<TaskDbo> byDate = taskRepository.findByDateAndOwnerOrderById(LocalDate.now(), userDbo);
-            if (byDate.size() == 1) {
-                text = new StringBuilder()
-                        .append(byDate.get(0).getDescription())
-                        .append("\n");
+//    @Scheduled(cron = "0 35 10 * * *")
+//    @Scheduled(cron = "0 05 19 * * *")
+//    public void collectAnswersFromUsers() {
+//        collectAnswerFromUsers = false;
+//        for (Long id : usersTaskMap.keySet()) {
+//            UserDbo userDbo = userRepository.findByTelegramId(id);
+//            TaskDbo taskDbo = new TaskDbo();
+//            taskDbo.setDate(LocalDate.now());
+//            taskDbo.setOwner(userDbo);
+//            taskDbo.setDescription(usersTaskMap.get(id));
+//            taskRepository.save(taskDbo);
+//            SendMessage message = new SendMessage();
+//            message.setText(userDbo.getName() + ":\n" + "");
+//        }
+//        usersTaskMap.clear();
+//    }
+//
+//
+//    @Scheduled(cron = "0 06 19 * * *")
+//    public void pullToChatAllTodayTasks() {
+//        List<UserDbo> all = userRepository.findAll().stream().filter(userDbo -> userDbo.getApprovedUser() && userDbo.getTelegramId() != null).collect(Collectors.toList());
+//        for (UserDbo userDbo : all) {
+//            StringBuilder text = null;
+//            List<TaskDbo> byDate = taskRepository.findByDateAndOwnerOrderById(LocalDate.now(), userDbo);
+//            if (byDate.size() == 1) {
+//                text = new StringBuilder()
+//                        .append(byDate.get(0).getDescription())
+//                        .append("\n");
+//
+//            } else if (byDate.size() == 2) {
+//                text = new StringBuilder()
+//                        .append(byDate.get(0).getDescription())
+//                        .append("\n")
+//                        .append("Результат:\n")
+//                        .append(byDate.get(1).getDescription());
+//            }
+//            if (text != null) {
+//                SendMessage message = new SendMessage();
+//                message.setText(userDbo.getName() + ":\n" + text.toString());
+//                message.setChatId(DREAM_TEAM_CHAT);
+////                message.setChatId(258331544L);
+//                sendToUserMessage(message);
+//            }
+//        }
+//    }
 
-            } else if (byDate.size() == 2) {
-                text = new StringBuilder()
-                        .append(byDate.get(0).getDescription())
-                        .append("\n")
-                        .append("Результат:\n")
-                        .append(byDate.get(1).getDescription());
-            }
-            if (text != null) {
-                SendMessage message = new SendMessage();
-                message.setText(userDbo.getName() + ":\n" + text.toString());
-                message.setChatId(DREAM_TEAM_CHAT);
-                sendToUserMessage(message);
-            }
+    private void pullToChatTodayTaskFromUser(UserDbo userDbo) {
+        StringBuilder text = null;
+        List<TaskDbo> byDate = taskRepository.findByDateAndOwnerOrderById(LocalDate.now(), userDbo);
+        if (byDate.size() == 1) {
+            text = new StringBuilder()
+                    .append(byDate.get(0).getDescription())
+                    .append("\n");
+
+        } else if (byDate.size() == 2) {
+            text = new StringBuilder()
+                    .append(byDate.get(0).getDescription())
+                    .append("\n")
+                    .append("Результат:\n")
+                    .append(byDate.get(1).getDescription());
+        }
+        if (text != null) {
+            SendMessage message = new SendMessage();
+            message.setText(userDbo.getName() + ":\n" + text.toString());
+            message.setChatId(DREAM_TEAM_CHAT);
+//                message.setChatId(258331544L);
+            sendToUserMessage(message);
         }
     }
 
@@ -130,7 +165,66 @@ public class TelegramBot extends TelegramLongPollingBot {
         Integer token = message.getMessageId();
         log.info(String.format("ChatId %s; token: %s; Get request: %s", userId, token, message.getText()));
 
-        if ("/start".equals(message.getText())) {
+        // кейсы только для апрувленых юзеров
+        if (approvedUsers.contains(message.getChatId())) {
+            if (UserPlanStatus.FACK_YOU.getValue().equals(message.getText())) {
+                SendMessage callback = createResponse("Дружище, извини, не хотел тебя обидеть \uD83D\uDE01", message);
+                callback.setReplyMarkup(addNoteForTodayPlan());
+                sendToUserMessage(callback);
+            } else if (UserPlanStatus.FACK_YOU_2.getValue().equals(message.getText())) {
+                usersStatusMap.remove(message.getChatId());
+                usersStatusMap.put(message.getChatId(), UserPlanStatus.WAIT_BUTTON_ANSWER);
+                usersTaskMap.remove(message.getChatId());
+                SendMessage callback = createResponse("Дружище, я тебя понял, начнём с начала \uD83D\uDC4C", message);
+                callback.setReplyMarkup(addNoteForTodayPlan());
+                sendToUserMessage(callback);
+            } else if (UserPlanStatus.WRITE_ANSWER.getValue().equals(message.getText())) {
+                usersStatusMap.remove(message.getChatId());
+                usersStatusMap.put(message.getChatId(), UserPlanStatus.WRITE_ANSWER);
+                SendMessage callback = createResponse("Ок, ты пиши, а я потом передам насяльнику \uD83D\uDE01", message);
+                sendToUserMessage(callback);
+            } else if (usersStatusMap.containsKey(message.getChatId()) && usersStatusMap.get(message.getChatId()).equals(UserPlanStatus.WAIT_BUTTON_ANSWER)) {
+                SendMessage callback = createResponse("Дружище, тисни кнопку, это не сложно \uD83D\uDE08", message);
+                callback.setReplyMarkup(addNoteForTodayPlan());
+                sendToUserMessage(callback);
+            } else if (UserPlanStatus.COMMIT_ANSWER.getValue().equals(message.getText())) {
+                UserDbo userDbo = userRepository.findByTelegramId(message.getChatId());
+                TaskDbo taskDbo = new TaskDbo();
+                taskDbo.setDate(LocalDate.now());
+                taskDbo.setOwner(userDbo);
+                taskDbo.setDescription(usersTaskMap.get(message.getChatId()));
+                taskRepository.save(taskDbo);
+                usersStatusMap.remove(message.getChatId());
+                SendMessage callback = createResponse("Ок, ща я отправлю это насяльнику \uD83D\uDE01", message);
+                sendToUserMessage(callback);
+                pullToChatTodayTaskFromUser(userDbo);
+            } /*else if (UserPlanStatus.COMMIT_ANSWER.getValue().equals(message.getText())) {
+                usersStatusMap.put(message.getChatId(), UserPlanStatus.WRITE_ANSWER);
+                SendMessage callback = createResponse("Ок, ты пиши, а я потом передам насяльнику :)", message);
+                sendToUserMessage(callback);
+            }*/ else if (message.getSticker() != null) { // защита от стикерспамеров
+                SendMessage callback = createResponse(":)", message);
+                sendToUserMessage(callback);
+            } else if (message.getSticker() != null) { // защита от стикерспамеров
+                SendMessage callback = createResponse(":)", message);
+                sendToUserMessage(callback);
+            } else {
+                if (usersStatusMap.containsKey(message.getChatId())) {
+                    String task = usersTaskMap.get(message.getChatId());
+                    if (task == null) {
+                        task = message.getText();
+                    } else {
+                        task = task.concat("\n" + message.getText());
+                    }
+                    usersTaskMap.put(message.getChatId(), task);
+                    SendMessage callback = createResponse("Ok!", message);
+                    callback.setReplyMarkup(continueAddingNoteForTodayPlan());
+                    sendToUserMessage(callback);
+                }
+                SendMessage callback = createResponse("\uD83D\uDE09", message);
+                sendToUserMessage(callback);
+            }
+        } else if ("/start".equals(message.getText())) {
             sendStartScreen(message);
         } else if (message.getContact() != null && message.getContact().getPhoneNumber() != null) {
             Optional<UserDbo> byPhone = userRepository.findByPhone(message.getContact().getPhoneNumber().replace("+", ""));
@@ -152,20 +246,24 @@ public class TelegramBot extends TelegramLongPollingBot {
                         "Обратитесь к разработчику бота (375333103331) для добавления вашего телефонного номера в список доверенных лиц", message);
                 sendToUserMessage(callback);
             }
-        } else if (message.getSticker() != null || !collectAnswerFromUsers) {
-            SendMessage callback = createResponse(":)", message);
+        } else if (message.getSticker() != null) {
+            SendMessage callback = createResponse("\uD83D\uDE09", message);
             sendToUserMessage(callback);
-        } else if (collectAnswerFromUsers && approvedUsers.contains(message.getChatId())) {
-            String task = usersTaskMap.get(message.getChatId());
-            if (task == null) {
-                task = message.getText();
-            } else {
-                task = task.concat("\n" + message.getText());
-            }
-            usersTaskMap.put(message.getChatId(), task);
-            SendMessage callback = createResponse("Ok!", message);
+        } else {
+            SendMessage callback = createResponse("\uD83D\uDE09", message);
             sendToUserMessage(callback);
         }
+// else if (approvedUsers.contains(message.getChatId())) {
+//            String task = usersTaskMap.get(message.getChatId());
+//            if (task == null) {
+//                task = message.getText();
+//            } else {
+//                task = task.concat("\n" + message.getText());
+//            }
+//            usersTaskMap.put(message.getChatId(), task);
+//            SendMessage callback = createResponse("Ok!", message);
+//            sendToUserMessage(callback);
+
     }
 
 
@@ -241,6 +339,40 @@ public class TelegramBot extends TelegramLongPollingBot {
         KeyboardButton keyboardButton = new KeyboardButton("Зарегистрироваться в боте!");
         keyboardButton.setRequestContact(true);
         keyboardRow.add(keyboardButton);
+        keyboard.add(keyboardRow);
+
+        replyKeyboardMarkup.setKeyboard(keyboard);
+        replyKeyboardMarkup.setOneTimeKeyboard(true);
+        return replyKeyboardMarkup;
+    }
+
+    private ReplyKeyboardMarkup addNoteForTodayPlan() {
+        ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
+        replyKeyboardMarkup.setSelective(true);
+        replyKeyboardMarkup.setResizeKeyboard(true);
+//        replyKeyboardMarkup.setOneTimeKeyboad(false);
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        KeyboardRow keyboardRow = new KeyboardRow();
+
+        keyboardRow.add(new KeyboardButton(UserPlanStatus.WRITE_ANSWER.getValue()));
+        keyboardRow.add(new KeyboardButton(UserPlanStatus.FACK_YOU.getValue()));
+        keyboard.add(keyboardRow);
+
+        replyKeyboardMarkup.setKeyboard(keyboard);
+        replyKeyboardMarkup.setOneTimeKeyboard(true);
+        return replyKeyboardMarkup;
+    }
+
+    private ReplyKeyboardMarkup continueAddingNoteForTodayPlan() {
+        ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
+        replyKeyboardMarkup.setSelective(true);
+        replyKeyboardMarkup.setResizeKeyboard(true);
+//        replyKeyboardMarkup.setOneTimeKeyboad(false);
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        KeyboardRow keyboardRow = new KeyboardRow();
+
+        keyboardRow.add(new KeyboardButton(UserPlanStatus.COMMIT_ANSWER.getValue()));
+        keyboardRow.add(new KeyboardButton(UserPlanStatus.FACK_YOU_2.getValue()));
         keyboard.add(keyboardRow);
 
         replyKeyboardMarkup.setKeyboard(keyboard);
