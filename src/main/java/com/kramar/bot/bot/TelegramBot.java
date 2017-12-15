@@ -55,7 +55,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "0 50 15 * * *")
+    @Scheduled(cron = "0 0 10 * * *")
     public void askCurrentTaskForToday() {
         collectAnswerFromUsers = true;
         usersStatusMap.clear();
@@ -70,7 +70,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "0 55 15 * * *")
+    @Scheduled(cron = "0 0 19 * * *")
     public void askResultOfCurrentTask() {
         collectAnswerFromUsers = true;
         usersStatusMap.clear();
